@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Users\19VD5\.Rider2019.1\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\19VD5\.Rider2019.1\system\resharper-host\local\Transient\ReSharperHost\v191\SolutionCaches\_BodyIndexBasics-WPF.-1542112050.00" t="ExcludeRecursive" />
+    <e p="C:\Users\19VD5\Documents\BodyIndexBasics-WPF" t="IncludeRecursive">
+      <e p="App.config" t="Include" />
+      <e p="App.xaml" t="Include" />
+      <e p="App.xaml.cs" t="Include" />
+      <e p="bin" t="ExcludeRecursive" />
+      <e p="BodyIndexBasics-WPF.csproj" t="IncludeRecursive" />
+      <e p="BodyIndexBasics-WPF.sln" t="IncludeFlat" />
+      <e p="Images" t="Include">
+        <e p="Kinect.ico" t="Include" />
+        <e p="Logo.png" t="Include" />
+        <e p="ScreenshotHover.png" t="Include" />
+        <e p="ScreenshotNormal.png" t="Include" />
+        <e p="Status.png" t="Include" />
+      </e>
+      <e p="MainWindow.xaml" t="Include" />
+      <e p="MainWindow.xaml.cs" t="Include" />
+      <e p="obj" t="ExcludeRecursive" />
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="Properties" t="Include">
+        <e p="AssemblyInfo.cs" t="Include" />
+        <e p="Resources.Designer.cs" t="Include" />
+        <e p="Resources.resx" t="Include" />
+        <e p="Settings.Designer.cs" t="Include" />
+        <e p="Settings.settings" t="Include" />
+      </e>
+    </e>
+  </component>
+</project>
