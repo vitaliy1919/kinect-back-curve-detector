@@ -115,8 +115,8 @@ namespace KinectBackCurveDetector
             this.kinectSensor.Open();
 
             // set the status text
-            this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
-                                                            : Properties.Resources.NoSensorStatusText;
+            this.StatusText = this.kinectSensor.IsAvailable ? "Kinect is running"
+                                                            : "Kinect is not available";
 
             // use the window object as the view model in this simple example
             this.DataContext = this;
@@ -233,14 +233,14 @@ namespace KinectBackCurveDetector
 
             timer.Stop();
             writetext.WriteLine($"{1000.0 / timer.ElapsedMilliseconds} fps, {timer.ElapsedMilliseconds} ms");
+
+            // dispose of data
             depthBuffer.Dispose();
             bodyIndexBuffer.Dispose();
 
             bodyFrame.Dispose();
             depthFrame.Dispose();
             bodyIndexFrame.Dispose();
-            // dispose of unused data
-
         }
 
         Comparison<Point> pointCompare = delegate (Point p1, Point p2)
@@ -578,6 +578,8 @@ namespace KinectBackCurveDetector
             // on failure, set the status text
             this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
                                                             : Properties.Resources.SensorNotAvailableStatusText;
+            this.StatusText = this.kinectSensor.IsAvailable ? "Kinect is connected"
+                                                         : "Kinect is not available";
         }
 
         private void TextBox_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
