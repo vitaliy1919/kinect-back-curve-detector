@@ -4,7 +4,7 @@
 // </copyright>
 //------------------------------------------------------------------------------
 
-namespace Microsoft.Samples.Kinect.BodyIndexBasics
+namespace KinectBackCurveDetector
 {
     using System;
     using System.Windows;

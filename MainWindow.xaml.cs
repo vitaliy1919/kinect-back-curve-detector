@@ -1,10 +1,6 @@
-﻿//------------------------------------------------------------------------------
-// <copyright file="MainWindow.xaml.cs" company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
-//------------------------------------------------------------------------------
+﻿
 
-namespace Microsoft.Samples.Kinect.BodyIndexBasics
+namespace KinectBackCurveDetector
 {
     using System;
     using System.ComponentModel;
@@ -19,6 +15,8 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
     using Microsoft.Kinect;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Timers;
+
     /// <summary>
     /// Interaction logic for the MainWindow
     /// </summary>
@@ -62,13 +60,12 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
         /// Bitmap to display
         /// </summary>
         private WriteableBitmap bodyIndexBitmap = null;
-        private WriteableBitmap depthBitmap;
-        string dataSource;
+        private WriteableBitmap spineBitmap;
         /// <summary>
         /// Intermediate storage for frame data converted to color
         /// </summary>
         private uint[] bodyIndexPixels = null;
-        private uint[] depthPixels = null;
+        private uint[] spinePixels = null;
         /// <summary>
         /// Current status text to display
         /// </summary>
@@ -92,7 +89,7 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
             // open the reader for the depth frames
             this.bodyIndexFrameReader = this.kinectSensor.BodyIndexFrameSource.OpenReader();
 
-           
+
             // wire handler for frame arrival
             //this.bodyIndexFrameReader.FrameArrived += this.Reader_FrameArrived;
             Closing += OnWindowClosing;
@@ -101,15 +98,18 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
             
             // allocate space to put the pixels being converted
             this.bodyIndexPixels = new uint[this.bodyIndexFrameDescription.Width * this.bodyIndexFrameDescription.Height];
-            this.depthPixels = new uint[depthFrameDescription.Width * depthFrameDescription.Height];
+            this.spinePixels = new uint[depthFrameDescription.Width * depthFrameDescription.Height];
             // create the bitmap to display
             this.bodyIndexBitmap = new WriteableBitmap(this.bodyIndexFrameDescription.Width, this.bodyIndexFrameDescription.Height, 96.0, 96.0, PixelFormats.Bgr32, null);
-            this.depthBitmap = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Bgr32, null);
+            this.spineBitmap = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Bgr32, null);
             // set IsAvailableChanged event notifier    
             this.kinectSensor.IsAvailableChanged += this.Sensor_IsAvailableChanged;
 
-            this.depthAndBodyIndexReader = this.kinectSensor.OpenMultiSourceFrameReader(FrameSourceTypes.Depth | FrameSourceTypes.BodyIndex | FrameSourceTypes.Body);
 
+            // Create reader for depth and body data
+            // To calculate back position
+            this.depthAndBodyIndexReader = this.kinectSensor.OpenMultiSourceFrameReader(FrameSourceTypes.Depth | FrameSourceTypes.BodyIndex | FrameSourceTypes.Body);
+            
             this.depthAndBodyIndexReader.MultiSourceFrameArrived += this.MultisorceReader_FrameArrived;
             // open the sensor
             this.kinectSensor.Open();
@@ -125,63 +125,8 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
             this.InitializeComponent();
         }
 
-        private void MultisorceReader_FrameArrived(object sender, MultiSourceFrameArrivedEventArgs e)
+        private Body getActiveBody(BodyFrame bodyFrame)
         {
-            MultiSourceFrame multiSourceFrame = e.FrameReference.AcquireFrame();
-            if (multiSourceFrame == null)
-                return;
-            using (BodyFrame bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame())
-            {
-                if (bodyFrame == null)
-                    return;
-                using (DepthFrame depthFrame = multiSourceFrame.DepthFrameReference.AcquireFrame())
-                {
-                    if (depthFrame == null)
-                        return;
-                    using (BodyIndexFrame bodyIndexFrame = multiSourceFrame.BodyIndexFrameReference.AcquireFrame())
-                    {
-                        if (bodyIndexFrame == null)
-                            return;
-                        var bodyIndexBuffer = bodyIndexFrame.BodyIndexFrameSource;
-                        GetBackPosition(depthFrame, bodyIndexFrame, bodyFrame);
-                        // verify data and write the color data to the display bitmap
-                        //if (((this.bodyIndexFrameDescription.Width * this.bodyIndexFrameDescription.Height) == bodyIndexBuffer.Size) &&
-                        //    (this.bodyIndexFrameDescription.Width == this.bodyIndexBitmap.PixelWidth) && (this.bodyIndexFrameDescription.Height == this.bodyIndexBitmap.PixelHeight))
-                        //{
-                        //    this.ProcessBodyIndexFrameData(bodyIndexBuffer.UnderlyingBuffer, bodyIndexBuffer.Size);
-                        //    bodyIndexFrameProcessed = true;
-                        //}
-                    }
-                }
-            }
-        }
-
-        private void calculateRotationAngle(CameraSpacePoint leftShoulder, CameraSpacePoint rightShoulder, out double tan, out double cos)
-        {
-            tan = 0;
-            cos = 1;
-        
-            var zDiff = rightShoulder.Z - leftShoulder.Z;
-            var xDiff = rightShoulder.X - leftShoulder.X;
-            tan = -zDiff / xDiff;
-            cos = xDiff / (Math.Sqrt(xDiff * xDiff + zDiff * zDiff));
-            if (Math.Abs(this.angle) > 1e-5)
-            {
-                var alpha = this.angle / 360f * 2 * Math.PI;
-                tan = Math.Tan(alpha);
-                cos = Math.Cos(alpha);
-            }
-        }
-
-        private static Point depthSpacePointToPoint(DepthSpacePoint depthSpacePoint)
-        {
-            return new Point(depthSpacePoint.X, depthSpacePoint.Y);
-        }
-        double maxHeightM = Double.MinValue, minHeightM = Double.MaxValue;
-        double maxDepthM = Double.MinValue, minDepthM = Double.MaxValue;
-        private unsafe void GetBackPosition(DepthFrame depthFrame, BodyIndexFrame bodyIndexFrame, BodyFrame bodyFrame)
-        {
-            writetext.WriteLine("GetBackPosition:");
             if (this.bodies == null)
                 this.bodies = new Body[6];
             bodyFrame.GetAndRefreshBodyData(this.bodies);
@@ -193,245 +138,244 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
                     if (activeBody == null)
                         activeBody = body;
                     else
+                    {
                         StatusText = "More than 1 body found";
+                        return null;
+                    }
                 }
             }
-            if (activeBody == null)
-                return;
-            writetext.WriteLine("Body found");
-            var joints = activeBody.Joints;
-            var backTracked =
-                joints[JointType.SpineShoulder].TrackingState == TrackingState.Tracked &&
-                joints[JointType.SpineBase].TrackingState == TrackingState.Tracked &&
-                joints[JointType.ShoulderLeft].TrackingState == TrackingState.Tracked &&
-                joints[JointType.ShoulderRight].TrackingState == TrackingState.Tracked &&
-                joints[JointType.Head].TrackingState == TrackingState.Tracked;
-            if (!backTracked)
-                return;
-            writetext.WriteLine("Joints are tracked");
-            var leftShoulder = joints[JointType.ShoulderLeft].Position;
-            var rightShoulder = joints[JointType.ShoulderRight].Position;
-            var spineBase = joints[JointType.SpineBase].Position;
-            var spineShoulder = joints[JointType.SpineShoulder].Position;
-            var neck = joints[JointType.Head].Position;
+            return activeBody;
+        }
 
-            calculateRotationAngle(leftShoulder, rightShoulder, out double tan, out double cos);
-            var backPoints2D = new DepthSpacePoint[5];
-            kinectSensor.CoordinateMapper.MapCameraPointsToDepthSpace(new CameraSpacePoint[5]
-            { leftShoulder, rightShoulder, spineBase, spineShoulder, neck }, backPoints2D);
-            var leftShoulder2D = depthSpacePointToPoint(backPoints2D[0]);
-            var rightShoulder2D = depthSpacePointToPoint(backPoints2D[1]);
-            var spineBase2D = depthSpacePointToPoint(backPoints2D[2]);
-            var spineShoulder2D = depthSpacePointToPoint(backPoints2D[3]);
-            var neck2D = depthSpacePointToPoint(backPoints2D[4]);
+        private bool aquireFrames(MultiSourceFrameArrivedEventArgs e, out BodyFrame bodyFrame, out DepthFrame depthFrame, out BodyIndexFrame bodyIndexFrame)
+        {
+            MultiSourceFrame multiSourceFrame = e.FrameReference.AcquireFrame();
 
-            var spineLine = Line2D.makeLine(spineBase2D, spineShoulder2D);
-            var leftShoulderLine = spineLine.makeParalelLine(leftShoulder2D);
-            var rightShoulderLine = spineLine.makeParalelLine(rightShoulder2D);
-            var hipLine = spineLine.makePerpendicularLine(new Point(spineBase2D.X, spineBase2D.Y - 0.15*(spineShoulder2D.Y - spineBase2D.Y)));
-            var neckLine = spineLine.makePerpendicularLine(neck2D);
+            bodyFrame = null;
+            depthFrame = null;
+            bodyIndexFrame = null;
 
-            using (var depthBuffer = depthFrame.LockImageBuffer())
+            if (multiSourceFrame == null)
+                return false;
+
+            bodyFrame = multiSourceFrame.BodyFrameReference.AcquireFrame();
+            if (bodyFrame == null)
+                return false;
+
+            depthFrame = multiSourceFrame.DepthFrameReference.AcquireFrame();
+            if (depthFrame == null)
             {
-                var width = depthFrameDescription.Width;
-                var height = depthFrameDescription.Height;
+                bodyFrame.Dispose();
+                return false;
+
+            }
+
+            bodyIndexFrame = multiSourceFrame.BodyIndexFrameReference.AcquireFrame();
+            if (bodyIndexFrame == null)
+            {
+                bodyFrame.Dispose();
+                depthFrame.Dispose();
+                return false;
+            }
+
+            return true;
+            
+        }
+        private bool aquireBodyDataAndBuffers(
+            BodyFrame bodyFrame, DepthFrame depthFrame, BodyIndexFrame bodyIndexFrame, 
+            out Body body, out KinectBuffer depthBuffer, out KinectBuffer bodyIndexBuffer)
+        {
+            depthBuffer = null;
+            bodyIndexBuffer = null;
+
+            body = getActiveBody(bodyFrame);
+            if (body == null)
+                return false;
+
+            depthBuffer = depthFrame.LockImageBuffer();
+            var width = depthFrameDescription.Width;
+            var height = depthFrameDescription.Height;
+            if (depthBuffer == null ||
+                (width * height) != (depthBuffer.Size / this.depthFrameDescription.BytesPerPixel))
+                return false;
+
+            bodyIndexBuffer = bodyIndexFrame.LockImageBuffer();
+            if (bodyIndexBuffer == null || bodyIndexBuffer.Size * 2 != depthBuffer.Size)
+            {
+                depthBuffer.Dispose();
+                return false;
+            }
+            return true;
+
+        }
+        private void MultisorceReader_FrameArrived(object sender, MultiSourceFrameArrivedEventArgs e)
+        {
+            // acquire all frames and then process them
+            if (!aquireFrames(e, out var bodyFrame, out var depthFrame, out var bodyIndexFrame))
+                return;
+
+            if (!aquireBodyDataAndBuffers(bodyFrame, depthFrame, bodyIndexFrame, out var body, out var depthBuffer, out var bodyIndexBuffer))
+            {
+                bodyFrame.Dispose();
+                depthFrame.Dispose();
+                bodyIndexFrame.Dispose();
+                return;
+            }
+            timer.Restart();
+
+            // calculate and show the back position on the screen
+            var spinePoints = GetSpinePoints(body, depthBuffer, bodyIndexBuffer);
            
 
-                if (!(((width * height) == (depthBuffer.Size / this.depthFrameDescription.BytesPerPixel))))
-                    return;
-                using (var bodyIndexBuffer = bodyIndexFrame.LockImageBuffer())
-                {
-                    List<int> rightPoints = new List<int>(height);
-                    for (int i = 0; i < height; i++)
-                        rightPoints.Add(0);
+        
+            drawSpinePoints(spinePoints);
+            RenderBodyIndexPixels();
 
-                    Array.Clear(depthPixels, 0, depthPixels.Length);
-                    var bodyIndexFrameDataSize = bodyIndexBuffer.Size;
-                    var depthFrameDataSize = depthBuffer.Size;
-                    if (bodyIndexFrameDataSize*2 != depthFrameDataSize)
-                        return;
-                    var bodyIndexFrameData = bodyIndexBuffer.UnderlyingBuffer;
-                   
-                    byte* frameData = (byte*)bodyIndexFrameData;
-                    ushort* depthFrameData = (ushort*)depthBuffer.UnderlyingBuffer;
-                    // convert body index to a visual representation
-                    string a = "";
+            timer.Stop();
+            writetext.WriteLine($"{1000.0 / timer.ElapsedMilliseconds} fps, {timer.ElapsedMilliseconds} ms");
+            depthBuffer.Dispose();
+            bodyIndexBuffer.Dispose();
 
-                    var depthSpacePoint = new DepthSpacePoint();
-                    var point3D = new CameraSpacePoint();
-                    
-                    int[] diffs = new int[] { -1, 0, 1 };
+            bodyFrame.Dispose();
+            depthFrame.Dispose();
+            bodyIndexFrame.Dispose();
+            // dispose of unused data
 
-                    for (int i = 0; i < (int)bodyIndexFrameDataSize; ++i)
-                    {
-                        // the BodyColor array has been sized to match
-                        // BodyFrameSource.BodyCount
+        }
 
-                        if (frameData[i] < BodyColor.Length)
-                        {
-                            depthSpacePoint.X = i % width;
-                            depthSpacePoint.Y = i / width;
-                            point3D = kinectSensor.CoordinateMapper.MapDepthPointToCameraSpace(depthSpacePoint, depthFrameData[i]);
-                            var x = i % width;
-                            var y = i / width;
-                            int neighbours = 0;
-                            for (int xdiff = 0; xdiff < 3; xdiff++)
-                                for (int ydiff = 0; ydiff < 3; ydiff++)
-                                {
-                                    var newX = x + xdiff;
-                                    var newY = y + ydiff;
-                                    var pos = newY * width + newX;
-                                    if (pos > 0 && pos < (int)bodyIndexFrameDataSize && frameData[pos] == frameData[i])
-                                        neighbours++;
-                                }
-                            //if (neighbours <= 2)
-                            //    continue;
-                            if (point3D.Y > maxHeightM)
-                                maxHeightM = point3D.Y;
-                            if (point3D.Y < minHeightM)
-                                minHeightM = point3D.Y;
+        Comparison<Point> pointCompare = delegate (Point p1, Point p2)
+        {
+            return p1.X.CompareTo(p2.X);
+        };
+        Stopwatch timer = new Stopwatch();
+        private void drawSpinePoints(List<Point> spinePoints)
+        {
+            Array.Clear(spinePixels, 0, spinePixels.Length);
 
-                            if (point3D.Z > maxDepthM)
-                                maxDepthM = point3D.Z;
-                            if (point3D.Z < minDepthM)
-                                minDepthM = point3D.Z;
+            var width = depthFrameDescription.Width;
+            var height = depthFrameDescription.Height;
 
-                            //StatusText = $"heigth: {minHeightM} ... {maxHeightM}, depth: {minDepthM} ... {maxDepthM}";
+            // calculate max and mix points 
+            // of the spine
+            int maxHeightPoint = 0, minHeightPoint = 0;
+            int maxZPoint = 0, minZPoint = 0;
+            for (int i = 0; i < spinePoints.Count; i++)
+            {
+                if (spinePoints[minHeightPoint].Y > spinePoints[i].Y)
+                    minHeightPoint = i;
+                if (spinePoints[maxHeightPoint].Y < spinePoints[i].Y)
+                    maxHeightPoint = i;
 
-                        }
-                    }
-                    writetext.WriteLine($"heigth: {minHeightM} ... {maxHeightM}, depth: {minDepthM} ... {maxDepthM}");
-                    //minHeightM = Math.Floor(minHeightM);
-                    //maxHeightM = Math.Ceiling(maxHeightM);
-                    //minHeightM = -1.3;
-                    //maxHeightM = 1.3;
-                    //minDepthM = 0;
-                    bool pointIsOnBack;
-                    int sX, sY;
-                    sX = width - 1 - (int)(height / (maxHeightM - minHeightM) * (leftShoulder.Z - minDepthM));
-                    sY = height - 1 - (int)((leftShoulder.Y - minHeightM) / (maxHeightM - minHeightM) * height + minHeightM);
-                    writetext.WriteLine($"Left shoulder: {sX}, {sY}");
-                    sX = (int)((sX - depthSpacePoint.X * tan) * cos);
-                    writetext.WriteLine($"Left shoulder: {sX}, {sY}");
-                    sX = width - 1 - (int)(height / (maxHeightM - minHeightM) * (rightShoulder.Z - minDepthM));
-                    sY = height - 1 - (int)((rightShoulder.Y - minHeightM) / (maxHeightM - minHeightM) * height + minHeightM);
-                    writetext.WriteLine($"Right shoulder: {sX}, {sY}");
+                if (spinePoints[minZPoint].X > spinePoints[i].X)
+                    minZPoint = i;
+                if (spinePoints[maxZPoint].X < spinePoints[i].X)
+                    maxZPoint = i;
 
-                    sX = (int)((sX - depthSpacePoint.X * tan) * cos);
-                    writetext.WriteLine($"Right shoulder: {sX}, {sY}");
-                    Point point = new Point();
-                    Line2D.PointPosition spineHipPosition = hipLine.GetPointPosition(spineShoulder2D);
-                    Line2D.PointPosition spineNeckPosition = neckLine.GetPointPosition(spineShoulder2D);
-                    Line2D.PointPosition leftShoulderRelativePosition, rightShoulderRelativePosition, hipRelativePosition, neckRelativePosition;
-                    //List<Point> backPoints = new List<Point>();
-                    int lastPointY = -1;
-                    writetext.WriteLine("############## DATA TRANSFER BEGIN ##############");
-                    for (int i = 0; i < (int)bodyIndexFrameDataSize; ++i)
-                    {
-                        // the BodyColor array has been sized to match
-                        // BodyFrameSource.BodyCount
-                       
-                        if (frameData[i] < BodyColor.Length)
-                        {
-                            point.X = i % width;
-                            point.Y = i / width;
-                            leftShoulderRelativePosition = leftShoulderLine.GetPointPosition(point);
-                            rightShoulderRelativePosition = rightShoulderLine.GetPointPosition(point);
-                            hipRelativePosition = hipLine.GetPointPosition(point);
-                            neckRelativePosition = neckLine.GetPointPosition(point);
+            }
+            double roundFactor = 0.3;
 
-                            pointIsOnBack =
-                                (leftShoulderRelativePosition == Line2D.PointPosition.Right || leftShoulderRelativePosition == Line2D.PointPosition.OnLine) &&
-                                (rightShoulderRelativePosition == Line2D.PointPosition.Left || rightShoulderRelativePosition == Line2D.PointPosition.OnLine) &&
-                                (hipRelativePosition == spineHipPosition || hipRelativePosition == Line2D.PointPosition.OnLine) &&
-                                (neckRelativePosition == spineNeckPosition || neckRelativePosition == Line2D.PointPosition.OnLine);
-                            //this.bodyIndexPixels[i] = BodyColor[frameData[i]];
+            // round them, otherwise the picture is to shaky
+            // because max and min value are slightly different from frame to frame
+            double maxHeight = BackTrackerHelper.upperBound(spinePoints[maxHeightPoint].Y, roundFactor);
+            double minHeight = BackTrackerHelper.lowerBound(spinePoints[minHeightPoint].Y, roundFactor);
+            double maxZ = BackTrackerHelper.upperBound(spinePoints[maxZPoint].X, roundFactor);
+            double minZ = BackTrackerHelper.lowerBound(spinePoints[minZPoint].X, roundFactor);
+            double conversionRateY = height / (maxHeight - minHeight);
+            double conversionRateZ = width / (maxZ - minZ);
+            double conversionRate = Math.Min(conversionRateY, conversionRateZ);
 
-                            // this pixel is part of a player,
-                            // display the appropriate color
-                            if (pointIsOnBack)
-                                this.bodyIndexPixels[i] = 0xFFFFFFFF;
-                            else
-                                this.bodyIndexPixels[i] = BodyColor[frameData[i]];
-                            //if (!pointIsOnBack)
-                            //    continue;
-                            if (lastPointY != -1 && lastPointY != i / width)
-                                writetext.WriteLine("-100, -100");
-                            lastPointY = i / width;
-
-                            depthSpacePoint.X = i % width;
-                            depthSpacePoint.Y = i / width;
-
-                            point3D = kinectSensor.CoordinateMapper.MapDepthPointToCameraSpace(depthSpacePoint, depthFrameData[i]);
-                            writetext.WriteLine($"{point3D.Z}, {point3D.Y}");
-                            //int newX = (int) ((double)(depthFrame.DepthMaxReliableDistance - 2*depthFrameData[i])/(depthFrame.DepthMaxReliableDistance) * width);
-                            int newX = width - 1 - (int)(height / (maxHeightM - minHeightM) * (point3D.Z - minDepthM));
-                            var oldX = newX;
-                            //var sin = Math.Sin(this.angle);
-                            newX = (int)((newX - depthSpacePoint.X * tan) * cos);
-                            //if (oldX < newX)
-                            //    sin = 0;
-                            //newX = (int)(newX / cos + (depthSpacePoint.X - newX * tan) * sin);
-                            int newY = height - 1 - (int)((point3D.Y - minHeightM) / (maxHeightM - minHeightM) * (height-1));
-                            this.depthPixels[newY * width + newX] = pointIsOnBack ? 0xFFFFFFFF : BodyColor[frameData[i]];
-                          
-                            CameraSpacePoint cameraPoint = kinectSensor.CoordinateMapper.MapDepthPointToCameraSpace(depthSpacePoint, depthFrameData[i]);
-                            //Trace.WriteLine($"{cameraPoint.X} {cameraPoint.Y} {cameraPoint.Z}");
-                            //a += cameraPoint.X;
-                            //a += ' '; a += cameraPoint.Y;
-                            //a += ' '; a += cameraPoint.Z;
-                            //a += '\n';
-                                                         //depthPixels[i]
-                        }
-                        else
-                        {
-                            // this pixel is not part of a player
-                            // display black
-                            this.bodyIndexPixels[i] = 0x00000000;
-                        }
-                    }
-                    for (int i = 0; i < (int)bodyIndexFrameDataSize; ++i)
-                    {
-                        var newX = i % width;
-                        var newY = i / width;
-                 
-                        if (this.depthPixels[newY * width + newX] != 0x00000000)
-                        {
-                            int currentRightPoint = rightPoints[newY];
-                            int pointNeighbours = 0;
-                            for (int xDiffI = 0; xDiffI < 3; xDiffI++)
-                            {
-                                for (int yDiffI = 0; yDiffI < 3; yDiffI++)
-                                {
-                                    var adjustX = newX + diffs[xDiffI];
-                                    var adjustY = newY + diffs[yDiffI];
-                                    if (adjustX < 0 || adjustX >= width)
-                                        continue;
-                                    if (adjustY < 0 || adjustY >= height)
-                                        continue;
-                                    if (this.depthPixels[adjustY * width + adjustX] != 0x00000000)
-                                    {
-                                        pointNeighbours++;
-                                    }
-                                }
-                            }
-                            if (newX > currentRightPoint && pointNeighbours >= 8)
-                                rightPoints[newY] = newX;
-                        }
-                    }
-                    writetext.WriteLine("############## DATA TRANSFER END ##############");
-                    for (int y = 0; y < depthFrameDescription.Height; y++)
-                        for (int i = 0; i < 1; i++)
-                            this.depthPixels[y * depthFrameDescription.Width + rightPoints[y] + i] = 0xFFFFFFFF;
-                    //Trace.WriteLine(a);
-                    this.RenderBodyIndexPixels();
-                    this.depthBitmap.WritePixels(
-                    new Int32Rect(0, 0, this.depthBitmap.PixelWidth, this.depthBitmap.PixelHeight),
-                    this.depthPixels,
-                    this.depthBitmap.PixelWidth * (int)BytesPerPixel,
+            // convert coordinates of a spine to pixels on the screen
+            for (int i = 0; i < spinePoints.Count; i++)
+            {
+                int pictureY = height - 1 - (int)(conversionRate * (spinePoints[i].Y - minHeight));
+                int pictureX = (int)(conversionRate * (spinePoints[i].X - minZ));
+                this.spinePixels[pictureY * width + pictureX] = BodyColor[0];
+            }
+            
+            this.spineBitmap.WritePixels(
+                new Int32Rect(0, 0, this.spineBitmap.PixelWidth, this.spineBitmap.PixelHeight),
+                    this.spinePixels,
+                    this.spineBitmap.PixelWidth * (int)BytesPerPixel,
                     0);
+            
+
+        }
+        private unsafe List<Point> GetSpinePoints(Body activeBody,KinectBuffer depthBuffer, KinectBuffer bodyIndexBuffer)
+        {
+            var joints = activeBody.Joints;
+            if (!BackTrackerHelper.isBodyTracked(joints))
+                return null;
+
+            // calculateRotationAngle(leftShoulder, rightShoulder, out double tan, out double cos);
+
+            var width = depthFrameDescription.Width;
+            var height = depthFrameDescription.Height;
+
+            var bodyIndexFrameData = bodyIndexBuffer.UnderlyingBuffer;
+            byte* frameData = (byte*)bodyIndexFrameData;
+            ushort* depthFrameData = (ushort*)depthBuffer.UnderlyingBuffer;
+            
+            // preparation work
+            List<Point> spinePoints = new List<Point>(height);
+            BackArea backArea = new BackArea(kinectSensor, joints);
+            int lastPointY = -1;
+            Point point = new Point();
+            var depthSpacePoint = new DepthSpacePoint();
+            var point3D = new CameraSpacePoint();
+
+            List<Point> rowPoints = new List<Point>();
+            var size = bodyIndexBuffer.Size;
+            for (int i = 0; i < (int)size; ++i)
+            {
+                // the BodyColor array has been sized to match
+                // BodyFrameSource.BodyCount
+
+
+                // check if point belong to a person
+                if (frameData[i] < BodyColor.Length)
+                {
+                    point.X = i % width;
+                    point.Y = i / width;
+                    depthSpacePoint.X = i % width;
+                    depthSpacePoint.Y = i / width;
+
+                    // check if point is on the back
+                    var pointIsOnBack = backArea.isPointInSpineArea(point);
+                    if (pointIsOnBack)
+                        this.bodyIndexPixels[i] = 0xFFFFFFFF;
+                    else
+                        this.bodyIndexPixels[i] = BodyColor[frameData[i]];
+                    if (!pointIsOnBack)
+                        continue;
+
+                    // fill the current row of points (pixels that have the same Y)
+                    point3D = kinectSensor.CoordinateMapper.MapDepthPointToCameraSpace(depthSpacePoint, depthFrameData[i]);
+                    rowPoints.Add(new Point(point3D.Z, point3D.Y));
+                    if (i / width != lastPointY && rowPoints.Count != 0)
+                    {
+                        // if the current pixel doesn't belong to the same row
+                        // process the current row and calculate the spine point from it
+                        rowPoints.Sort(pointCompare);
+                        spinePoints.Add(BackTrackerHelper.calculateSpinePoint(rowPoints));
+                        rowPoints.Clear();
+                    }
+                    lastPointY = i / width;
+                }
+                else
+                {
+                    this.bodyIndexPixels[i] = 0x00000000;
                 }
             }
+
+            // process the last line of pixels
+            if (rowPoints.Count != 0)
+            {
+                rowPoints.Sort(pointCompare);
+                spinePoints.Add(BackTrackerHelper.calculateSpinePoint(rowPoints));
+                rowPoints.Clear();
+            }
+            return spinePoints;
+           
         }
 
         /// <summary>
@@ -454,7 +398,7 @@ namespace Microsoft.Samples.Kinect.BodyIndexBasics
         {
             get
             {
-                return this.depthBitmap;
+                return this.spineBitmap;
             }
         }
 

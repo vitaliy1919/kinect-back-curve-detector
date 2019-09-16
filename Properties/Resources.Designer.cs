@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Microsoft.Samples.Kinect.BodyIndexBasics.Properties {
+namespace KinectBackCurveDetector.Properties {
     using System;
     
     

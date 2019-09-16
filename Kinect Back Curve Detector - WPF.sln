@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BodyIndexBasics-WPF", "BodyIndexBasics-WPF.csproj", "{A979DC2F-45C6-4141-9A15-E7540A069709}"
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29102.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kinect Back Curve Detector - WPF", "Kinect Back Curve Detector - WPF.csproj", "{A979DC2F-45C6-4141-9A15-E7540A069709}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,5 +18,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3E04CC30-9EC0-4F65-A480-CEE64FC22919}
 	EndGlobalSection
 EndGlobal
