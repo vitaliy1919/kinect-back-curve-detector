@@ -39,6 +39,14 @@ Rows visualisation, each row is in different color:
 
 ![Rows visualization](report-images/row_visualization.png)
 
+Also to even further speed up the process we may project not all points of the body, but rather only the points of the back. As Kinect provides us with skeleton data, we can check if the point is inside the back really easy. At first, from Kinect data the neck, left and right shoulders,hip, spine points are found. After that we make a line through spine points. Then the lines perpendicular to the spine line are drawn through the hip and neck, parallel to the spine line - through left and right shoulder. The space confined by these lines is considered to be back area. After that we check for each point if it's inside the area, if so - project it to the median plane. 
+
+Back area (shown in white):
+
+![Back area](report-images/back_area.png)
+
+Note that Kinect sometimes do not recognize hip point correctly (it is too high), when the person is sited, so maybe in future another approach should be used.
+
 ## Back data processing
 
 Right now the back data received from Kinect is not processed, it's just shown on the screen.
@@ -63,3 +71,33 @@ private void MultisorceReader_FrameArrived(object sender, MultiSourceFrameArrive
 }
 ```
 ```spinePoints``` is the ```List``` of ```Point```, where the first coordinate of point stores depth, the second - height relative to Kinect sensor. The List is sorted by height, meaning that the first point has the maximum height, the last one - minimum.
+
+## Raw data processing
+
+Sometimes is useful to process data acquired from Kinect with another application to better understand some patterns and test your ideas *(see [this project](https://github.com/vitaliy1919/Back-Curvature-From-File) to see an example of a project that process and visualize data from Kinect).* 
+
+In order to turn writing to file on you have to change the value of a constant `debugData` to `true`:
+```MainWindow.xaml.cs```:
+``` csharp
+    public partial class MainWindow : Window, INotifyPropertyChanged
+    {
+
+        private const bool debugData = true;
+```
+
+After that the file `write.txt` will be generated.
+
+The content of the file:
+```
+############## FRAME START ##############
+1.215, 0.2373521
+1.207, 0.2357958
+-100, -100
+1.237, 0.2383046
+1.219, 0.2348433
+1.203, 0.2317669
+1.195, 0.2302315
+************** FRAME END **************
+```
+
+Inside there is a description of each frame - starting with `############## FRAME START ##############` and ending with `************** FRAME END **************`. Between these lines there will be the information about the projected points - each line contains the depth and height of the point. Each row of points is separated by a special line - `-100 -100`

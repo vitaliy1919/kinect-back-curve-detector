@@ -22,6 +22,8 @@ namespace KinectBackCurveDetector
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+
+        private const bool debugData = false;
         /// <summary>
         /// Size of the RGB pixel in the bitmap
         /// </summary>
@@ -323,6 +325,8 @@ namespace KinectBackCurveDetector
             var depthSpacePoint = new DepthSpacePoint();
             var point3D = new CameraSpacePoint();
 
+            if (debugData)
+                writetext.WriteLine("############## FRAME START ##############");
             List<Point> rowPoints = new List<Point>();
             var size = bodyIndexBuffer.Size;
             for (int i = 0; i < (int)size; ++i)
@@ -351,6 +355,8 @@ namespace KinectBackCurveDetector
                     // fill the current row of points (pixels that have the same Y)
                     point3D = kinectSensor.CoordinateMapper.MapDepthPointToCameraSpace(depthSpacePoint, depthFrameData[i]);
                     rowPoints.Add(new Point(point3D.Z, point3D.Y));
+                    if (debugData)
+                        writetext.WriteLine($"{point3D.Z}, {point3D.Y}");
                     if (i / width != lastPointY && rowPoints.Count != 0)
                     {
                         // if the current pixel doesn't belong to the same row
@@ -358,6 +364,8 @@ namespace KinectBackCurveDetector
                         rowPoints.Sort(pointCompare);
                         spinePoints.Add(BackTrackerHelper.calculateSpinePoint(rowPoints));
                         rowPoints.Clear();
+                        if (debugData)
+                            writetext.WriteLine("-100, -100");
                     }
                     lastPointY = i / width;
                 }
@@ -366,6 +374,9 @@ namespace KinectBackCurveDetector
                     this.bodyIndexPixels[i] = 0x00000000;
                 }
             }
+
+            if (debugData)
+                writetext.WriteLine("************** FRAME END **************");
 
             // process the last line of pixels
             if (rowPoints.Count != 0)
@@ -443,7 +454,12 @@ namespace KinectBackCurveDetector
                 this.bodyIndexFrameReader.Dispose();
                 this.bodyIndexFrameReader = null;
             }
-
+            if (this.depthAndBodyIndexReader != null)
+            {
+                this.depthAndBodyIndexReader.MultiSourceFrameArrived -= this.MultisorceReader_FrameArrived;
+                this.depthAndBodyIndexReader.Dispose();
+                this.depthAndBodyIndexReader = null;
+            }
             if (this.kinectSensor != null)
             {
                 this.kinectSensor.Close();
