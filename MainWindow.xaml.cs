@@ -252,6 +252,8 @@ namespace KinectBackCurveDetector
         Stopwatch timer = new Stopwatch();
         private void drawSpinePoints(List<Point> spinePoints)
         {
+            if (spinePoints == null)
+                return;
             Array.Clear(spinePixels, 0, spinePixels.Length);
 
             var width = depthFrameDescription.Width;

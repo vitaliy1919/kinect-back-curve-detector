@@ -8,6 +8,12 @@ In order for the application to work correctly, a person has to sit with their b
 
 ![Program Main Window](report-images/mainwindow.png)
 
+## Prerequisites 
+- Kinect Sensor V2 (hardware)
+- Kinect for Windows SDK 2.0
+- Visual Studio 2019 or higher
+- .NET Framework 4.5 (or probably higher)
+
 ## Algorithm overview
 
 ![Planes overview](report-images/planes.png)
